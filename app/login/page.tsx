@@ -3,28 +3,46 @@
 import type React from "react"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { supabase, getSupabaseErrorMessage } from "@/lib/supabase"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Simulação de validação de credenciais
-    if (email === "teste@trimflow.com" && password === "senha123") {
-      setError("")
-      alert("Login bem-sucedido!")
-      // Redirecionar para o dashboard ou outra página
-      // window.location.href = "/dashboard";
-    } else {
-      setError("Email ou senha incorretos. Tente novamente.")
+    setIsLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        toast.error(getSupabaseErrorMessage(error))
+        return
+      }
+
+      if (data.user) {
+        toast.success("Login realizado com sucesso!")
+        router.push("/") // Redireciona para o dashboard
+      }
+    } catch (error) {
+      toast.error("Erro inesperado. Tente novamente.")
+      console.error("Erro no login:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -47,6 +65,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
             <div className="grid gap-2">
@@ -57,11 +76,11 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
-            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-            <Button type="submit" className="w-full">
-              Entrar
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

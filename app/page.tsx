@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import { CalendarDays, Users, UserCheck, PlusCircle } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,9 +16,23 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
+import { useAuth } from "@/hooks/useAuth"
 
-export default function DashboardPage() {
-  const userName = "João" // Placeholder for user name
+function DashboardContent() {
+  const { user, signOut } = useAuth()
+  
+  // Obter nome do usuário dos metadados ou usar email como fallback
+  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || "Usuário"
+
+  const handleLogout = async () => {
+    try {
+      await signOut()
+      toast.success("Logout realizado com sucesso!")
+    } catch (error) {
+      toast.error("Erro ao fazer logout")
+    }
+  }
 
   return (
     <SidebarInset>
@@ -45,7 +60,7 @@ export default function DashboardPage() {
               <DropdownMenuItem>Configurações</DropdownMenuItem>
               <DropdownMenuItem>Suporte</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Sair</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>Sair</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -94,5 +109,13 @@ export default function DashboardPage() {
         <div className="min-h-[300px] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
       </main>
     </SidebarInset>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
   )
 }
