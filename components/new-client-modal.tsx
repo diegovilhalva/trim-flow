@@ -1,9 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon, PlusCircle } from "lucide-react"
+import { CalendarIcon, PlusCircle, Edit } from "lucide-react"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
@@ -24,13 +24,26 @@ import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 
-interface NewClientModalProps {
-  onClientAdded?: () => void
+interface Client {
+  id: string
+  name: string
+  phone: string | null
+  email: string | null
+  last_visit: string | null
+  notes: string | null
 }
 
-export function NewClientModal({ onClientAdded }: NewClientModalProps) {
+interface ClientModalProps {
+  client?: Client // If provided, modal is in edit mode
+  onClientSaved?: () => void
+  trigger?: React.ReactNode
+}
+
+export function ClientModal({ client, onClientSaved, trigger }: ClientModalProps) {
   const [open, setOpen] = React.useState(false)
   const [loading, setLoading] = React.useState(false)
+  
+  const isEditing = !!client
   
   // Form fields
   const [name, setName] = React.useState("")
@@ -45,6 +58,29 @@ export function NewClientModal({ onClientAdded }: NewClientModalProps) {
     phone?: string
     email?: string
   }>({})
+
+  // Pre-populate fields when editing
+  React.useEffect(() => {
+    if (client && open) {
+      setName(client.name || "")
+      setPhone(client.phone || "")
+      setEmail(client.email || "")
+      setNotes(client.notes || "")
+      
+      // Parse last_visit date
+      if (client.last_visit) {
+        try {
+          const date = parseISO(client.last_visit)
+          setLastVisitDate(date)
+        } catch (error) {
+          console.error('Error parsing date:', error)
+          setLastVisitDate(undefined)
+        }
+      } else {
+        setLastVisitDate(undefined)
+      }
+    }
+  }, [client, open])
 
   const formatPhoneNumber = (value: string) => {
     if (!value) return value
@@ -126,7 +162,6 @@ export function NewClientModal({ onClientAdded }: NewClientModalProps) {
 
       // Prepare client data
       const clientData = {
-        user_id: user.id,
         name: name.trim(),
         phone: phone.trim(),
         email: email.trim() || null,
@@ -134,34 +169,49 @@ export function NewClientModal({ onClientAdded }: NewClientModalProps) {
         notes: notes.trim() || null,
       }
 
-      // Insert client into database
-      const { error: insertError } = await supabase
-        .from('clients')
-        .insert([clientData])
+      if (isEditing) {
+        // Update existing client
+        const { error: updateError } = await supabase
+          .from('clients')
+          .update(clientData)
+          .eq('id', client.id)
 
-      if (insertError) {
-        throw insertError
+        if (updateError) {
+          throw updateError
+        }
+
+        toast.success("Cliente atualizado com sucesso!", {
+          description: `Os dados de ${name} foram atualizados.`
+        })
+      } else {
+        // Create new client
+        const { error: insertError } = await supabase
+          .from('clients')
+          .insert([{ ...clientData, user_id: user.id }])
+
+        if (insertError) {
+          throw insertError
+        }
+
+        toast.success("Cliente cadastrado com sucesso!", {
+          description: `${name} foi adicionado à sua lista de clientes.`
+        })
       }
-
-      // Success
-      toast.success("Cliente cadastrado com sucesso!", {
-        description: `${name} foi adicionado à sua lista de clientes.`
-      })
 
       // Reset form and close modal
       resetForm()
       setOpen(false)
       
       // Notify parent component to refresh list
-      if (onClientAdded) {
-        onClientAdded()
+      if (onClientSaved) {
+        onClientSaved()
       }
 
     } catch (error: any) {
-      console.error('Error creating client:', error)
+      console.error(`Error ${isEditing ? 'updating' : 'creating'} client:`, error)
       
       // Show error message
-      let errorMessage = "Erro ao cadastrar cliente. Tente novamente."
+      let errorMessage = `Erro ao ${isEditing ? 'atualizar' : 'cadastrar'} cliente. Tente novamente.`
       
       if (error.message?.includes("duplicate key value")) {
         if (error.message.includes("email")) {
@@ -173,7 +223,7 @@ export function NewClientModal({ onClientAdded }: NewClientModalProps) {
         errorMessage = error.message
       }
       
-      toast.error("Erro ao cadastrar cliente", {
+      toast.error(`Erro ao ${isEditing ? 'atualizar' : 'cadastrar'} cliente`, {
         description: errorMessage
       })
     } finally {
@@ -188,18 +238,30 @@ export function NewClientModal({ onClientAdded }: NewClientModalProps) {
     setOpen(isOpen)
   }
 
+  // Default trigger for new client
+  const defaultTrigger = (
+    <Button size="sm">
+      <PlusCircle className="mr-2 h-4 w-4" />
+      Novo Cliente
+    </Button>
+  )
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button size="sm">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Novo Cliente
-        </Button>
+        {trigger || defaultTrigger}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Novo Cliente</DialogTitle>
-          <DialogDescription>Preencha os detalhes para adicionar um novo cliente.</DialogDescription>
+          <DialogTitle>
+            {isEditing ? "Editar Cliente" : "Novo Cliente"}
+          </DialogTitle>
+          <DialogDescription>
+            {isEditing 
+              ? "Atualize os dados do cliente." 
+              : "Preencha os detalhes para adicionar um novo cliente."
+            }
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
@@ -311,10 +373,18 @@ export function NewClientModal({ onClientAdded }: NewClientModalProps) {
             onClick={handleSaveClient}
             disabled={loading}
           >
-            {loading ? "Salvando..." : "Salvar cliente"}
+            {loading 
+              ? (isEditing ? "Atualizando..." : "Salvando...") 
+              : (isEditing ? "Atualizar cliente" : "Salvar cliente")
+            }
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
+}
+
+// Export both the generic modal and a specific new client modal for backward compatibility
+export function NewClientModal({ onClientAdded }: { onClientAdded?: () => void }) {
+  return <ClientModal onClientSaved={onClientAdded} />
 }

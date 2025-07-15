@@ -1,14 +1,14 @@
-# Implementação do Sistema de Cadastro de Clientes
+# Implementação do Sistema de Cadastro e Edição de Clientes
 
 ## Resumo
 
-Foi implementada a lógica completa para cadastrar clientes no Supabase, incluindo validações, feedback visual e integração com a lista de clientes.
+Foi implementada a lógica completa para cadastrar e editar clientes no Supabase, incluindo validações, feedback visual e integração com a lista de clientes.
 
 ## Funcionalidades Implementadas
 
-### 1. Modal de Novo Cliente (`components/new-client-modal.tsx`)
+### 1. Modal de Cliente (`components/new-client-modal.tsx`)
 
-#### Campos obrigatórios:
+#### Campos suportados:
 - **Nome completo** (obrigatório)
 - **Telefone** (obrigatório com formatação automática)
 - **Email** (opcional com validação de formato)
@@ -21,51 +21,46 @@ Foi implementada a lógica completa para cadastrar clientes no Supabase, incluin
 - Email com validação de formato quando preenchido
 - Formatação automática do telefone: `(99) 99999-9999`
 
-#### Integração com Supabase:
+#### Modos de operação:
+
+##### **Modo Criação** (novo cliente):
+- Integração com Supabase via `supabase.from('clients').insert([...])`
 - Obtém o `user_id` do usuário logado via `supabase.auth.getUser()`
-- Insere dados na tabela `clients` com RLS (Row Level Security)
-- Mapeia campos do formulário para a estrutura do banco:
-  - `name` → campo nome
-  - `phone` → campo telefone
-  - `email` → campo email (null se vazio)
-  - `last_visit` → data da última visita (null se não selecionada)
-  - `notes` → observações (null se vazio)
+- Toast de sucesso: "Cliente cadastrado com sucesso!"
 
-#### Feedback ao usuário:
-- **Toast de sucesso**: "Cliente cadastrado com sucesso!"
-- **Toast de erro**: Mensagens específicas para diferentes tipos de erro
-- **Estados de loading**: Botão mostra "Salvando..." durante o processo
-- **Campos desabilitados**: Durante o salvamento
+##### **Modo Edição** (cliente existente):
+- ✅ **Integração com Supabase via `supabase.from('clients').update({...}).eq('id', clientId)`**
+- ✅ **Pré-preenchimento automático dos campos com dados existentes**
+- ✅ **Atualização dos campos `name`, `phone`, `email`, `notes`**
+- ✅ **Toast de sucesso: "Cliente atualizado com sucesso!"**
+- ✅ **Lista atualizada automaticamente após edição**
 
-#### Comportamento:
-- Após sucesso: formulário é limpo, modal fechado e lista atualizada
-- Após erro: modal permanece aberto para correções
-- Callback `onClientAdded` notifica componente pai para atualizar lista
+#### Funcionalidades técnicas:
+- **Detecção automática de modo**: Baseado na presença da prop `client`
+- **Parse de datas**: Conversão de string ISO para Date object para pré-preenchimento
+- **Reset inteligente**: Campos são limpos apenas ao fechar sem dados de edição
+- **Triggers customizáveis**: Prop `trigger` permite botões personalizados
+- **Compatibilidade**: Mantém componente `NewClientModal` para retrocompatibilidade
 
 ### 2. Página de Clientes (`app/clients/page.tsx`)
 
-#### Funcionalidades:
+#### Funcionalidades de listagem:
 - **Carregamento dinâmico**: Busca clientes do Supabase em tempo real
 - **Busca/filtro**: Por nome, telefone ou email
 - **Atualização manual**: Botão "Atualizar" com indicador de loading
-- **Exclusão de clientes**: Com confirmação e feedback
 - **Estados vazios**: Mensagens diferentes para sem clientes vs sem resultados
 
-#### Interface aprimorada:
-- Contador de clientes no cabeçalho
-- Campo de busca em tempo real
-- Tabela responsiva com colunas:
-  - Nome (negrito)
-  - Telefone (formatado ou "-")
-  - Email (link clicável ou "-")
-  - Última visita (badge com data ou "-")
-  - Observações (truncadas com tooltip)
-  - Ações (editar/excluir)
+#### ✅ **Funcionalidades de edição implementadas:**
+- **Botão de editar**: Cada linha da tabela possui botão de edição
+- **Modal integrado**: Utiliza o `ClientModal` em modo edição
+- **Dados pré-preenchidos**: Cliente selecionado é passado para o modal
+- **Atualização automática**: Lista refresh após edição bem-sucedida
+- **Feedback visual**: Toasts de sucesso/erro
 
-#### Estados de loading:
-- Loading inicial com spinner
-- Refresh com spinner no botão
-- Estados vazios informativos
+#### Funcionalidades de exclusão:
+- **Confirmação**: Dialog de confirmação antes de excluir
+- **Feedback**: Toast de sucesso após exclusão
+- **Atualização**: Lista atualizada automaticamente
 
 ## Estrutura do Banco de Dados
 
@@ -85,6 +80,45 @@ CREATE TABLE clients (
 );
 ```
 
+## ✅ **Operações Supabase Implementadas**
+
+### **Criação de cliente:**
+```typescript
+await supabase
+  .from('clients')
+  .insert([{ ...clientData, user_id: user.id }])
+```
+
+### **✅ Edição de cliente:**
+```typescript
+await supabase
+  .from('clients')
+  .update({
+    name: name.trim(),
+    phone: phone.trim(),
+    email: email.trim() || null,
+    notes: notes.trim() || null,
+  })
+  .eq('id', clientId)
+```
+
+### **Exclusão de cliente:**
+```typescript
+await supabase
+  .from('clients')
+  .delete()
+  .eq('id', clientId)
+```
+
+### **Listagem de clientes:**
+```typescript
+await supabase
+  .from('clients')
+  .select('*')
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false })
+```
+
 ## Segurança
 
 - **RLS (Row Level Security)** habilitado
@@ -100,42 +134,74 @@ CREATE TABLE clients (
 3. **Erros de rede**: Mensagens genéricas com instrução para tentar novamente
 4. **Validação**: Mensagens específicas por campo
 
-### Toast notifications:
-- Utiliza biblioteca `sonner` já configurada no projeto
-- Posicionamento: `top-right`
-- Temas consistentes com design system
+### ✅ **Toast notifications contextuais:**
+- **Criação**: "Cliente cadastrado com sucesso!"
+- **✅ Edição**: "Cliente atualizado com sucesso!"**
+- **Exclusão**: "Cliente excluído com sucesso!"
+- **Erros**: Mensagens específicas por operação
 
-## Fluxo de Uso
+## ✅ **Fluxo de Edição Implementado**
 
-1. **Usuário clica "Novo Cliente"**
-2. **Preenche formulário** com validação em tempo real
-3. **Clica "Salvar cliente"**
-4. **Sistema valida** dados localmente
-5. **Sistema autentica** usuário no Supabase
-6. **Sistema salva** cliente no banco
-7. **Toast de sucesso** é exibido
-8. **Modal fecha** e formulário limpa
-9. **Lista atualiza** automaticamente
+1. **Usuário clica no botão "Editar"** (ícone de lápis)
+2. **Modal abre em modo edição** com dados pré-preenchidos
+3. **Usuário modifica campos** com validação em tempo real
+4. **Clica "Atualizar cliente"**
+5. **Sistema valida** dados localmente
+6. **✅ Sistema executa UPDATE** no Supabase usando `client.id`
+7. **✅ Toast de sucesso** é exibido
+8. **✅ Modal fecha** automaticamente
+9. **✅ Lista atualiza** com dados atualizados
 
 ## Arquivos Modificados
 
-- `components/new-client-modal.tsx` - Modal completamente reescrito
-- `app/clients/page.tsx` - Página completamente reescrita
+- ✅ `components/new-client-modal.tsx` - **Reescrito para suportar criação e edição**
+- ✅ `app/clients/page.tsx` - **Integrado com modal de edição**
 - Utilizou configuração existente em `lib/supabase.ts`
+
+## Componentes Exportados
+
+### `ClientModal` - **Componente principal**
+```typescript
+interface ClientModalProps {
+  client?: Client // Se fornecido, modal está em modo edição
+  onClientSaved?: () => void // Callback após salvar
+  trigger?: React.ReactNode // Botão personalizado
+}
+```
+
+### `NewClientModal` - **Componente para compatibilidade**
+```typescript
+interface NewClientModalProps {
+  onClientAdded?: () => void // Callback após adicionar
+}
+```
 
 ## Dependências Utilizadas
 
 - `@supabase/supabase-js` - Client do Supabase
 - `sonner` - Toast notifications  
-- `date-fns` - Formatação de datas
+- `date-fns` - Formatação e parsing de datas (`parseISO` para edição)
 - `lucide-react` - Ícones
 - Componentes UI existentes do projeto
 
-## Próximos Passos
+## ✅ **Status da Implementação**
 
-A implementação atual está completa e funcional. Funcionalidades futuras podem incluir:
+### **✅ CONCLUÍDO:**
+- ✅ Cadastro de clientes
+- ✅ **Edição de clientes**
+- ✅ **Atualização de campos `name`, `phone`, `email`, `notes`**
+- ✅ **Modal com pré-preenchimento de dados**
+- ✅ **Toast de sucesso/erro para edição**
+- ✅ **Lista atualizada após edição**
+- ✅ Exclusão de clientes
+- ✅ Listagem e busca
+- ✅ Validações de formulário
+- ✅ Segurança RLS
+- ✅ Estados de loading
+- ✅ Responsividade
 
-- Edição de clientes existentes
+### **Próximas funcionalidades sugeridas:**
+- Histórico de alterações
 - Importação/exportação de clientes
-- Histórico de visitas
 - Integração com sistema de agendamentos
+- Filtros avançados por data, status, etc.

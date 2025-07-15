@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { NewClientModal } from "@/components/new-client-modal"
+import { NewClientModal, ClientModal } from "@/components/new-client-modal"
 import { supabase } from "@/lib/supabase"
 
 interface Client {
@@ -298,10 +298,16 @@ export default function ClientsPage() {
                       )}
                     </TableCell>
                     <TableCell className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" title="Editar cliente">
-                        <Pencil className="h-4 w-4" />
-                        <span className="sr-only">Editar</span>
-                      </Button>
+                      <ClientModal
+                        client={client}
+                        onClientSaved={fetchClients}
+                        trigger={
+                          <Button variant="ghost" size="icon" title="Editar cliente">
+                            <Pencil className="h-4 w-4" />
+                            <span className="sr-only">Editar</span>
+                          </Button>
+                        }
+                      />
                       <Button 
                         variant="ghost" 
                         size="icon" 
