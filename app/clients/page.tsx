@@ -14,6 +14,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -32,6 +43,89 @@ interface Client {
   notes: string | null
   created_at: string
   updated_at: string
+}
+
+interface DeleteClientDialogProps {
+  client: Client
+  onClientDeleted: () => void
+}
+
+function DeleteClientDialog({ client, onClientDeleted }: DeleteClientDialogProps) {
+  const [open, setOpen] = React.useState(false)
+  const [loading, setLoading] = React.useState(false)
+
+  const handleDeleteClient = async () => {
+    setLoading(true)
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', client.id)
+
+      if (error) {
+        throw error
+      }
+
+      toast.success("Cliente excluído com sucesso!", {
+        description: `${client.name} foi removido da sua lista.`
+      })
+
+      setOpen(false)
+      onClientDeleted()
+
+    } catch (error: any) {
+      console.error('Error deleting client:', error)
+      toast.error("Erro ao excluir cliente", {
+        description: error.message || "Tente novamente em alguns instantes."
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="Excluir cliente">
+          <Trash2 className="h-4 w-4" />
+          <span className="sr-only">Excluir</span>
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir Cliente</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja excluir o cliente <strong>"{client.name}"</strong>?
+            <br />
+            Esta ação não pode ser desfeita. Todos os dados do cliente serão removidos permanentemente.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={loading}>
+            Cancelar
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteClient}
+            disabled={loading}
+            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+          >
+            {loading ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Excluindo...
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir Cliente
+              </>
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
 }
 
 export default function ClientsPage() {
@@ -93,36 +187,6 @@ export default function ClientsPage() {
     setRefreshing(true)
     await fetchClients()
     setRefreshing(false)
-  }
-
-  const handleDeleteClient = async (client: Client) => {
-    if (!confirm(`Tem certeza que deseja excluir o cliente "${client.name}"?`)) {
-      return
-    }
-
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', client.id)
-
-      if (error) {
-        throw error
-      }
-
-      toast.success("Cliente excluído com sucesso!", {
-        description: `${client.name} foi removido da sua lista.`
-      })
-
-      // Refresh clients list
-      fetchClients()
-
-    } catch (error: any) {
-      console.error('Error deleting client:', error)
-      toast.error("Erro ao excluir cliente", {
-        description: error.message || "Tente novamente em alguns instantes."
-      })
-    }
   }
 
   const formatDate = (dateString: string | null) => {
@@ -308,15 +372,10 @@ export default function ClientsPage() {
                           </Button>
                         }
                       />
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        title="Excluir cliente"
-                        onClick={() => handleDeleteClient(client)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Excluir</span>
-                      </Button>
+                      <DeleteClientDialog
+                        client={client}
+                        onClientDeleted={fetchClients}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
