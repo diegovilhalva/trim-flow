@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { Search, Pencil, Trash2, PlusCircle } from "lucide-react"
+import { Search, Pencil, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { NewClientModal } from "@/components/new-client-modal" // Importar o novo modal
 
 // Dados mockados para a tabela de clientes
 const clients = [
@@ -94,10 +95,7 @@ export default function ClientsPage() {
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-xl md:text-2xl">Lista de Clientes</h2>
-          <Button className="ml-auto" size="sm">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Novo Cliente
-          </Button>
+          <NewClientModal /> {/* Usar o componente do modal aqui */}
         </div>
         <div className="relative w-full max-w-md">
           <Label htmlFor="search-client" className="sr-only">
