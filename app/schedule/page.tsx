@@ -4,7 +4,7 @@ import * as React from "react"
 import Image from "next/image"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon, Pencil, Trash2, PlusCircle } from "lucide-react"
+import { CalendarIcon, Pencil, Trash2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
+import { NewAppointmentModal } from "@/components/new-appointment-modal"
 
 // Dados mockados para agendamentos
 const allAppointments = [
@@ -129,10 +130,7 @@ export default function SchedulePage() {
                 <Calendar mode="single" selected={date} onSelect={setDate} initialFocus locale={ptBR} />
               </PopoverContent>
             </Popover>
-            <Button className="ml-auto sm:ml-0" size="sm">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Novo Agendamento
-            </Button>
+            <NewAppointmentModal />
           </div>
         </div>
 
