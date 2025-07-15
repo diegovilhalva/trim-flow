@@ -33,3 +33,80 @@ export const getSupabaseErrorMessage = (error: any): string => {
   }
   return 'Erro desconhecido. Tente novamente.'
 }
+
+export type Database = {
+  public: {
+    Tables: {
+      clients: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          phone: string | null
+          email: string | null
+          last_visit: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          phone?: string | null
+          email?: string | null
+          last_visit?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          phone?: string | null
+          email?: string | null
+          last_visit?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      appointments: {
+        Row: {
+          id: string
+          user_id: string
+          client_id: string
+          date: string
+          time: string
+          service: string
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          client_id: string
+          date: string
+          time: string
+          service: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          client_id?: string
+          date?: string
+          time?: string
+          service?: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+    }
+  }
+}

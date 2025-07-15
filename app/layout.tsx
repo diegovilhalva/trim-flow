@@ -2,10 +2,10 @@ import type React from "react"
 import type { Metadata } from "next/types"
 import { Inter } from "next/font/google"
 import { cookies } from "next/headers"
-import { Toaster } from "sonner"
 
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { Toaster } from "@/components/ui/sonner"
 
 import "./globals.css"
 
@@ -32,16 +32,7 @@ export default async function RootLayout({
           <AppSidebar />
           {children}
         </SidebarProvider>
-        <Toaster 
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: 'hsl(var(--background))',
-              color: 'hsl(var(--foreground))',
-              border: '1px solid hsl(var(--border))',
-            },
-          }}
-        />
+        <Toaster />
       </body>
     </html>
   )
