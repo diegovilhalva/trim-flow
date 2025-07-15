@@ -4,8 +4,10 @@ import * as React from "react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { CalendarIcon, PlusCircle } from "lucide-react"
+import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
+import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -22,13 +24,27 @@ import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 
-export function NewClientModal() {
+interface NewClientModalProps {
+  onClientAdded?: () => void
+}
+
+export function NewClientModal({ onClientAdded }: NewClientModalProps) {
   const [open, setOpen] = React.useState(false)
-  const [fullName, setFullName] = React.useState("")
+  const [loading, setLoading] = React.useState(false)
+  
+  // Form fields
+  const [name, setName] = React.useState("")
   const [phone, setPhone] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [lastVisitDate, setLastVisitDate] = React.useState<Date | undefined>(undefined)
-  const [observations, setObservations] = React.useState("")
+  const [notes, setNotes] = React.useState("")
+
+  // Form validation
+  const [errors, setErrors] = React.useState<{
+    name?: string
+    phone?: string
+    email?: string
+  }>({})
 
   const formatPhoneNumber = (value: string) => {
     if (!value) return value
@@ -48,30 +64,132 @@ export function NewClientModal() {
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formattedValue = formatPhoneNumber(e.target.value)
     setPhone(formattedValue)
+    // Clear phone error when user starts typing
+    if (errors.phone) {
+      setErrors(prev => ({ ...prev, phone: undefined }))
+    }
   }
 
-  const handleSaveClient = () => {
-    // Aqui você implementaria a lógica para salvar o cliente
-    // Por enquanto, apenas um console.log e fechar o modal
-    console.log({
-      fullName,
-      phone,
-      email,
-      lastVisitDate: lastVisitDate ? format(lastVisitDate, "yyyy-MM-dd") : null,
-      observations,
-    })
-    alert("Cliente salvo com sucesso! (Simulado)")
-    setOpen(false) // Fecha o modal após salvar
-    // Resetar campos
-    setFullName("")
+  const validateForm = () => {
+    const newErrors: typeof errors = {}
+
+    // Validate required fields
+    if (!name.trim()) {
+      newErrors.name = "Nome é obrigatório"
+    }
+
+    if (!phone.trim()) {
+      newErrors.phone = "Telefone é obrigatório"
+    } else {
+      // Validate phone format (should have at least 10 digits)
+      const phoneDigits = phone.replace(/\D/g, "")
+      if (phoneDigits.length < 10) {
+        newErrors.phone = "Telefone deve ter pelo menos 10 dígitos"
+      }
+    }
+
+    // Validate email format if provided
+    if (email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        newErrors.email = "Formato de email inválido"
+      }
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const resetForm = () => {
+    setName("")
     setPhone("")
     setEmail("")
     setLastVisitDate(undefined)
-    setObservations("")
+    setNotes("")
+    setErrors({})
+  }
+
+  const handleSaveClient = async () => {
+    if (!validateForm()) {
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        throw new Error("Usuário não encontrado. Faça login novamente.")
+      }
+
+      // Prepare client data
+      const clientData = {
+        user_id: user.id,
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || null,
+        last_visit: lastVisitDate ? format(lastVisitDate, "yyyy-MM-dd") : null,
+        notes: notes.trim() || null,
+      }
+
+      // Insert client into database
+      const { error: insertError } = await supabase
+        .from('clients')
+        .insert([clientData])
+
+      if (insertError) {
+        throw insertError
+      }
+
+      // Success
+      toast.success("Cliente cadastrado com sucesso!", {
+        description: `${name} foi adicionado à sua lista de clientes.`
+      })
+
+      // Reset form and close modal
+      resetForm()
+      setOpen(false)
+      
+      // Notify parent component to refresh list
+      if (onClientAdded) {
+        onClientAdded()
+      }
+
+    } catch (error: any) {
+      console.error('Error creating client:', error)
+      
+      // Show error message
+      let errorMessage = "Erro ao cadastrar cliente. Tente novamente."
+      
+      if (error.message?.includes("duplicate key value")) {
+        if (error.message.includes("email")) {
+          errorMessage = "Este email já está cadastrado para outro cliente."
+        } else {
+          errorMessage = "Já existe um cliente com essas informações."
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      toast.error("Erro ao cadastrar cliente", {
+        description: errorMessage
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen && !loading) {
+      resetForm()
+    }
+    setOpen(isOpen)
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button size="sm">
           <PlusCircle className="mr-2 h-4 w-4" />
@@ -85,37 +203,60 @@ export function NewClientModal() {
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="fullName">Nome completo</Label>
+            <Label htmlFor="name">Nome completo *</Label>
             <Input
-              id="fullName"
+              id="name"
               placeholder="Nome do cliente"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value)
+                if (errors.name) {
+                  setErrors(prev => ({ ...prev, name: undefined }))
+                }
+              }}
+              className={errors.name ? "border-red-500" : ""}
+              disabled={loading}
             />
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name}</p>
+            )}
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="phone">Telefone</Label>
+            <Label htmlFor="phone">Telefone *</Label>
             <Input
               id="phone"
               placeholder="(99) 99999-9999"
               value={phone}
               onChange={handlePhoneChange}
-              maxLength={15} // (99) 99999-9999
-              required
+              maxLength={15}
+              className={errors.phone ? "border-red-500" : ""}
+              disabled={loading}
             />
+            {errors.phone && (
+              <p className="text-sm text-red-500">{errors.phone}</p>
+            )}
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="email">Email (opcional)</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
               placeholder="cliente@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                if (errors.email) {
+                  setErrors(prev => ({ ...prev, email: undefined }))
+                }
+              }}
+              className={errors.email ? "border-red-500" : ""}
+              disabled={loading}
             />
+            {errors.email && (
+              <p className="text-sm text-red-500">{errors.email}</p>
+            )}
           </div>
 
           <div className="grid gap-2">
@@ -128,6 +269,7 @@ export function NewClientModal() {
                     "w-full justify-start text-left font-normal",
                     !lastVisitDate && "text-muted-foreground",
                   )}
+                  disabled={loading}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {lastVisitDate ? format(lastVisitDate, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
@@ -140,26 +282,37 @@ export function NewClientModal() {
                   onSelect={setLastVisitDate}
                   initialFocus
                   locale={ptBR}
+                  disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                 />
               </PopoverContent>
             </Popover>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="observations">Observações (opcional)</Label>
+            <Label htmlFor="notes">Observações</Label>
             <Textarea
-              id="observations"
+              id="notes"
               placeholder="Adicione anotações sobre o cliente..."
-              value={observations}
-              onChange={(e) => setObservations(e.target.value)}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={loading}
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button 
+            variant="outline" 
+            onClick={() => setOpen(false)}
+            disabled={loading}
+          >
             Cancelar
           </Button>
-          <Button onClick={handleSaveClient}>Salvar cliente</Button>
+          <Button 
+            onClick={handleSaveClient}
+            disabled={loading}
+          >
+            {loading ? "Salvando..." : "Salvar cliente"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
