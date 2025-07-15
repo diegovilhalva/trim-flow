@@ -5,6 +5,7 @@ import Image from "next/image"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { CalendarIcon, Pencil, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -22,61 +23,51 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { NewAppointmentModal } from "@/components/new-appointment-modal"
-
-// Dados mockados para agendamentos
-const allAppointments = [
-  {
-    id: "a1",
-    date: "2024-07-15", // Hoje
-    time: "10:00",
-    clientName: "João Silva",
-    service: "Corte Masculino",
-    observations: "Cliente pontual.",
-  },
-  {
-    id: "a2",
-    date: "2024-07-15", // Hoje
-    time: "11:30",
-    clientName: "Maria Souza",
-    service: "Corte Feminino e Hidratação",
-    observations: "",
-  },
-  {
-    id: "a3",
-    date: "2024-07-15", // Hoje
-    time: "14:00",
-    clientName: "Pedro Santos",
-    service: "Barba e Sobrancelha",
-    observations: "Gosta de toalha quente.",
-  },
-  {
-    id: "a4",
-    date: "2024-07-16", // Amanhã
-    time: "09:00",
-    clientName: "Ana Costa",
-    service: "Corte Masculino",
-    observations: "Primeiro agendamento.",
-  },
-  {
-    id: "a5",
-    date: "2024-07-17", // Depois de amanhã
-    time: "16:00",
-    clientName: "Carlos Oliveira",
-    service: "Corte e Barba",
-    observations: "",
-  },
-]
+import { getAppointments, getCurrentUser, type Appointment } from "@/lib/appointments"
 
 export default function SchedulePage() {
   const userName = "João" // Placeholder for user name
   const [date, setDate] = React.useState<Date | undefined>(new Date())
+  const [appointments, setAppointments] = React.useState<Appointment[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [refreshKey, setRefreshKey] = React.useState(0)
+
+  // Carregar agendamentos
+  const loadAppointments = React.useCallback(async () => {
+    if (!date) return
+
+    setLoading(true)
+    try {
+      const user = await getCurrentUser()
+      if (user) {
+        const formattedDate = format(date, "yyyy-MM-dd")
+        const appointmentsData = await getAppointments(user.id, formattedDate)
+        setAppointments(appointmentsData)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar agendamentos:', error)
+      toast.error("Erro ao carregar agendamentos")
+    } finally {
+      setLoading(false)
+    }
+  }, [date])
+
+  // Carregar agendamentos quando a data mudar
+  React.useEffect(() => {
+    loadAppointments()
+  }, [loadAppointments, refreshKey])
+
+  // Função para atualizar a lista quando um novo agendamento for criado
+  const handleAppointmentCreated = () => {
+    setRefreshKey(prev => prev + 1)
+  }
 
   // Filtra os agendamentos com base na data selecionada
   const filteredAppointments = React.useMemo(() => {
     if (!date) return []
     const formattedDate = format(date, "yyyy-MM-dd")
-    return allAppointments.filter((appt) => appt.date === formattedDate)
-  }, [date])
+    return appointments.filter((appt) => appt.date === formattedDate)
+  }, [appointments, date])
 
   return (
     <SidebarInset>
@@ -130,48 +121,61 @@ export default function SchedulePage() {
                 <Calendar mode="single" selected={date} onSelect={setDate} initialFocus locale={ptBR} />
               </PopoverContent>
             </Popover>
-            <NewAppointmentModal />
+            <NewAppointmentModal onAppointmentCreated={handleAppointmentCreated} />
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredAppointments.length > 0 ? (
-            filteredAppointments.map((appointment) => (
-              <Card key={appointment.id}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-lg font-bold">{appointment.clientName}</CardTitle>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Pencil className="h-4 w-4" />
-                      <span className="sr-only">Editar Agendamento</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Cancelar Agendamento</span>
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-sm text-muted-foreground">
-                    Horário: {appointment.time}
-                  </CardDescription>
-                  <CardDescription className="text-sm text-muted-foreground">
-                    Serviço: {appointment.service}
-                  </CardDescription>
-                  {appointment.observations && (
-                    <CardDescription className="text-sm text-muted-foreground mt-2">
-                      Obs: {appointment.observations}
+        {loading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p>Carregando agendamentos...</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredAppointments.length > 0 ? (
+              filteredAppointments.map((appointment) => (
+                <Card key={appointment.id}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-lg font-bold">
+                      {appointment.client?.name || 'Cliente não encontrado'}
+                    </CardTitle>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Pencil className="h-4 w-4" />
+                        <span className="sr-only">Editar Agendamento</span>
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Cancelar Agendamento</span>
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-sm text-muted-foreground">
+                      Horário: {appointment.time}
                     </CardDescription>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <div className="col-span-full text-center py-8 text-muted-foreground">
-              <p>Nenhum agendamento para esta data.</p>
-            </div>
-          )}
-        </div>
+                    <CardDescription className="text-sm text-muted-foreground">
+                      Serviço: {appointment.service}
+                    </CardDescription>
+                    {appointment.notes && (
+                      <CardDescription className="text-sm text-muted-foreground mt-2">
+                        Obs: {appointment.notes}
+                      </CardDescription>
+                    )}
+                    {appointment.client?.phone && (
+                      <CardDescription className="text-sm text-muted-foreground mt-1">
+                        Tel: {appointment.client.phone}
+                      </CardDescription>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                <p>Nenhum agendamento para esta data.</p>
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </SidebarInset>
   )
