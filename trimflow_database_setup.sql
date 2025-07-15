@@ -166,21 +166,21 @@ SELECT
     c.email as client_email,
     c.notes as client_notes
 FROM appointments a
-JOIN clients c ON a.client_id = c.id
+JOIN clients c ON a.client_id = c.id AND a.user_id = c.user_id
 WHERE a.date >= CURRENT_DATE
 ORDER BY a.date, a.time;
 
 -- View para estatísticas do barbeiro
 CREATE VIEW user_stats AS
 SELECT 
-    user_id,
+    c.user_id,
     COUNT(DISTINCT c.id) as total_clients,
     COUNT(a.id) as total_appointments,
     COUNT(CASE WHEN a.date >= CURRENT_DATE THEN 1 END) as upcoming_appointments,
     MAX(a.date) as last_appointment_date
 FROM clients c
-LEFT JOIN appointments a ON c.id = a.client_id
-GROUP BY user_id;
+LEFT JOIN appointments a ON c.id = a.client_id AND c.user_id = a.user_id
+GROUP BY c.user_id;
 
 -- ============================================================================
 -- INSERÇÃO DE DADOS EXEMPLO (opcional - remover em produção)

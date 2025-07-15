@@ -103,6 +103,8 @@ Fornece estatísticas básicas para cada barbeiro:
 SELECT * FROM user_stats WHERE user_id = 'seu_user_id';
 ```
 
+> **Nota**: As views foram corrigidas para evitar ambiguidade de colunas `user_id` nos JOINs entre tabelas.
+
 ## 💡 Exemplos de Uso
 
 ### Inserir um Cliente
@@ -164,6 +166,10 @@ COPY (SELECT * FROM appointments WHERE user_id = 'seu_user_id') TO 'appointments
 ```
 
 ## 🆘 Troubleshooting
+
+### Erro de Ambiguidade de Coluna
+**Erro**: `column reference "user_id" is ambiguous`
+**Solução**: Este erro foi corrigido na versão atual do script. Se ainda ocorrer, certifique-se de usar a versão mais recente do `trimflow_database_setup.sql`.
 
 ### Erro de Permissão
 Se você receber erros de permissão, verifique se:
