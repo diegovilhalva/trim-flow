@@ -40,7 +40,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <div className="flex h-[60px] items-center border-b px-6">
+      <div className="flex h-[60px] items-center border-b px-4">
         <Link href="/" className="flex items-center gap-2 font-semibold">
           <Package2 className="h-6 w-6" />
           <span className="">TrimFlow</span>
@@ -64,7 +64,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <div className="mt-auto p-2 border-t">
+      <div className="mt-auto p-4 border-t">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>

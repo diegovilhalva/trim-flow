@@ -47,7 +47,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-8 dark:bg-gray-950">
+          <div className="flex min-h-screen items-center justify-center bg-muted px-4 py-8">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <h1 className="text-3xl font-bold text-primary">TrimFlow</h1>

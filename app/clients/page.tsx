@@ -108,7 +108,7 @@ function DeleteClientDialog({ client, onClientDeleted }: DeleteClientDialogProps
           <AlertDialogAction
             onClick={handleDeleteClient}
             disabled={loading}
-            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                                    className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
           >
             {loading ? (
               <>
@@ -335,7 +335,7 @@ export default function ClientsPage() {
                       {client.email ? (
                         <a 
                           href={`mailto:${client.email}`}
-                          className="text-blue-600 hover:underline"
+                          className="text-primary hover:underline"
                         >
                           {client.email}
                         </a>
