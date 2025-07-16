@@ -276,11 +276,11 @@ export function ClientModal({ client, onClientSaved, trigger }: ClientModalProps
                   setErrors(prev => ({ ...prev, name: undefined }))
                 }
               }}
-              className={errors.name ? "border-red-500" : ""}
+              className={errors.name ? "border-destructive" : ""}
               disabled={loading}
             />
             {errors.name && (
-              <p className="text-sm text-red-500">{errors.name}</p>
+              <p className="text-sm text-destructive">{errors.name}</p>
             )}
           </div>
 
@@ -292,11 +292,11 @@ export function ClientModal({ client, onClientSaved, trigger }: ClientModalProps
               value={phone}
               onChange={handlePhoneChange}
               maxLength={15}
-              className={errors.phone ? "border-red-500" : ""}
+              className={errors.phone ? "border-destructive" : ""}
               disabled={loading}
             />
             {errors.phone && (
-              <p className="text-sm text-red-500">{errors.phone}</p>
+              <p className="text-sm text-destructive">{errors.phone}</p>
             )}
           </div>
 
@@ -313,11 +313,11 @@ export function ClientModal({ client, onClientSaved, trigger }: ClientModalProps
                   setErrors(prev => ({ ...prev, email: undefined }))
                 }
               }}
-              className={errors.email ? "border-red-500" : ""}
+              className={errors.email ? "border-destructive" : ""}
               disabled={loading}
             />
             {errors.email && (
-              <p className="text-sm text-red-500">{errors.email}</p>
+              <p className="text-sm text-destructive">{errors.email}</p>
             )}
           </div>
 
