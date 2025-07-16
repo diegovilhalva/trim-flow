@@ -151,3 +151,165 @@ export async function getCurrentUser() {
     return null
   }
 }
+
+// Dashboard Statistics Functions
+export interface DashboardStats {
+  totalClients: number
+  todayAppointments: number
+  futureAppointments: number
+  lastClient: {
+    name: string
+    service: string
+    time: string
+  } | null
+}
+
+export async function getDashboardStats(userId: string): Promise<DashboardStats> {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Get total clients count
+    const { count: totalClients, error: clientsError } = await supabase
+      .from('clients')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+
+    if (clientsError) {
+      console.error('Erro ao contar clientes:', clientsError)
+    }
+
+    // Get today's appointments count
+    const { count: todayAppointments, error: todayError } = await supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('date', today)
+
+    if (todayError) {
+      console.error('Erro ao contar agendamentos de hoje:', todayError)
+    }
+
+    // Get future appointments count (today and after)
+    const { count: futureAppointments, error: futureError } = await supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('date', today)
+
+    if (futureError) {
+      console.error('Erro ao contar agendamentos futuros:', futureError)
+    }
+
+    // Get last attended client (most recent appointment before today)
+    const { data: lastAppointment, error: lastError } = await supabase
+      .from('appointments')
+      .select(`
+        time,
+        service,
+        client:clients(name)
+      `)
+      .eq('user_id', userId)
+      .lt('date', today)
+      .order('date', { ascending: false })
+      .order('time', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (lastError && lastError.code !== 'PGRST116') {
+      console.error('Erro ao buscar último cliente:', lastError)
+    }
+
+    return {
+      totalClients: totalClients || 0,
+      todayAppointments: todayAppointments || 0,
+      futureAppointments: futureAppointments || 0,
+      lastClient: lastAppointment ? {
+        name: lastAppointment.client?.name || 'Cliente',
+        service: lastAppointment.service,
+        time: lastAppointment.time
+      } : null
+    }
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas do dashboard:', error)
+    return {
+      totalClients: 0,
+      todayAppointments: 0,
+      futureAppointments: 0,
+      lastClient: null
+    }
+  }
+}
+
+export async function getRecentClients(userId: string, limit: number = 5) {
+  try {
+    const { data: clients, error } = await supabase
+      .from('clients')
+      .select('id, name, phone, email, last_visit, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('Erro ao buscar clientes recentes:', error)
+      throw new Error('Erro ao buscar clientes recentes')
+    }
+
+    return clients
+  } catch (error) {
+    console.error('Erro ao buscar clientes recentes:', error)
+    return []
+  }
+}
+
+export async function getMonthlyAppointmentsStats(userId: string) {
+  try {
+    const today = new Date()
+    const currentMonth = today.getMonth()
+    const currentYear = today.getFullYear()
+    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
+    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
+
+    // Current month
+    const currentMonthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0]
+    const currentMonthEnd = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0]
+    
+    // Last month
+    const lastMonthStart = new Date(lastMonthYear, lastMonth, 1).toISOString().split('T')[0]
+    const lastMonthEnd = new Date(lastMonthYear, lastMonth + 1, 0).toISOString().split('T')[0]
+
+    const { count: currentMonthCount, error: currentError } = await supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('date', currentMonthStart)
+      .lte('date', currentMonthEnd)
+
+    const { count: lastMonthCount, error: lastError } = await supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('date', lastMonthStart)
+      .lte('date', lastMonthEnd)
+
+    if (currentError || lastError) {
+      console.error('Erro ao buscar estatísticas mensais:', currentError || lastError)
+    }
+
+    const current = currentMonthCount || 0
+    const last = lastMonthCount || 0
+    const percentageChange = last > 0 ? ((current - last) / last) * 100 : 0
+
+    return {
+      currentMonth: current,
+      lastMonth: last,
+      percentageChange: Math.round(percentageChange)
+    }
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas mensais:', error)
+    return {
+      currentMonth: 0,
+      lastMonth: 0,
+      percentageChange: 0
+    }
+  }
+}
