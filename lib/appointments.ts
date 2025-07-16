@@ -97,10 +97,13 @@ export async function getAppointments(userId: string, date?: string) {
 
 export async function getUpcomingAppointments(userId: string) {
   try {
+    const today = new Date().toISOString().split('T')[0]
+    
     const { data: appointments, error } = await supabase
       .from('upcoming_appointments')
       .select('*')
       .eq('user_id', userId)
+      .gt('date', today) // Apenas datas DEPOIS de hoje
       .order('date', { ascending: true })
       .order('time', { ascending: true })
 
@@ -311,5 +314,83 @@ export async function getMonthlyAppointmentsStats(userId: string) {
       lastMonth: 0,
       percentageChange: 0
     }
+  }
+}
+
+// Appointment Management Functions
+export interface UpdateAppointmentData {
+  client_id?: string
+  date?: string
+  time?: string
+  service?: string
+  notes?: string
+}
+
+export async function deleteAppointment(appointmentId: string, userId: string) {
+  try {
+    const { error } = await supabase
+      .from('appointments')
+      .delete()
+      .eq('id', appointmentId)
+      .eq('user_id', userId) // Garantir que só o proprietário pode deletar
+
+    if (error) {
+      console.error('Erro ao deletar agendamento:', error)
+      throw new Error('Erro ao deletar agendamento')
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao deletar agendamento:', error)
+    throw error
+  }
+}
+
+export async function updateAppointment(appointmentId: string, userId: string, updateData: UpdateAppointmentData) {
+  try {
+    const { data: appointment, error } = await supabase
+      .from('appointments')
+      .update({
+        ...updateData,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', appointmentId)
+      .eq('user_id', userId) // Garantir que só o proprietário pode atualizar
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Erro ao atualizar agendamento:', error)
+      throw new Error('Erro ao atualizar agendamento')
+    }
+
+    return appointment
+  } catch (error) {
+    console.error('Erro ao atualizar agendamento:', error)
+    throw error
+  }
+}
+
+export async function getAppointmentById(appointmentId: string, userId: string) {
+  try {
+    const { data: appointment, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        client:clients(id, name, phone, email)
+      `)
+      .eq('id', appointmentId)
+      .eq('user_id', userId)
+      .single()
+
+    if (error) {
+      console.error('Erro ao buscar agendamento:', error)
+      throw new Error('Erro ao buscar agendamento')
+    }
+
+    return appointment as Appointment
+  } catch (error) {
+    console.error('Erro ao buscar agendamento:', error)
+    throw error
   }
 }

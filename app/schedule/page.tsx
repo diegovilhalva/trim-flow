@@ -19,12 +19,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { NewAppointmentModal } from "@/components/new-appointment-modal"
-import { getAppointments, getUpcomingAppointments, getCurrentUser, type Appointment, type UpcomingAppointment } from "@/lib/appointments"
+import { EditAppointmentModal } from "@/components/edit-appointment-modal"
+import { getAppointments, getUpcomingAppointments, getCurrentUser, deleteAppointment, getAppointmentById, type Appointment, type UpcomingAppointment } from "@/lib/appointments"
 
 export default function SchedulePage() {
   const userName = "João" // Placeholder for user name
@@ -34,6 +45,15 @@ export default function SchedulePage() {
   const [loading, setLoading] = React.useState(true)
   const [loadingUpcoming, setLoadingUpcoming] = React.useState(true)
   const [refreshKey, setRefreshKey] = React.useState(0)
+  
+  // Estados para modal de edição
+  const [editModalOpen, setEditModalOpen] = React.useState(false)
+  const [appointmentToEdit, setAppointmentToEdit] = React.useState<Appointment | null>(null)
+  
+  // Estados para confirmação de deleção
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [appointmentToDelete, setAppointmentToDelete] = React.useState<{id: string, clientName: string} | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
 
   // Carregar agendamentos do dia
   const loadAppointments = React.useCallback(async () => {
@@ -85,6 +105,60 @@ export default function SchedulePage() {
   // Função para atualizar a lista quando um novo agendamento for criado
   const handleAppointmentCreated = () => {
     setRefreshKey(prev => prev + 1)
+  }
+
+  // Função para abrir modal de edição
+  const handleEditAppointment = async (appointmentId: string) => {
+    try {
+      const user = await getCurrentUser()
+      if (user) {
+        const appointment = await getAppointmentById(appointmentId, user.id)
+        setAppointmentToEdit(appointment)
+        setEditModalOpen(true)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar agendamento:', error)
+      toast.error("Erro ao carregar dados do agendamento")
+    }
+  }
+
+  // Função para fechar modal de edição
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false)
+    setAppointmentToEdit(null)
+  }
+
+  // Função para confirmar atualização
+  const handleAppointmentUpdated = () => {
+    setRefreshKey(prev => prev + 1)
+  }
+
+  // Função para abrir diálogo de confirmação de deleção
+  const handleDeleteAppointment = (appointmentId: string, clientName: string) => {
+    setAppointmentToDelete({ id: appointmentId, clientName })
+    setDeleteDialogOpen(true)
+  }
+
+  // Função para confirmar deleção
+  const handleConfirmDelete = async () => {
+    if (!appointmentToDelete) return
+
+    try {
+      setDeleting(true)
+      const user = await getCurrentUser()
+      if (user) {
+        await deleteAppointment(appointmentToDelete.id, user.id)
+        toast.success("Agendamento cancelado com sucesso!")
+        setRefreshKey(prev => prev + 1)
+        setDeleteDialogOpen(false)
+        setAppointmentToDelete(null)
+      }
+    } catch (error) {
+      console.error('Erro ao deletar agendamento:', error)
+      toast.error("Erro ao cancelar agendamento. Tente novamente.")
+    } finally {
+      setDeleting(false)
+    }
   }
 
   // Filtra os agendamentos com base na data selecionada
@@ -178,11 +252,21 @@ export default function SchedulePage() {
                           {appointment.client?.name || 'Cliente não encontrado'}
                         </CardTitle>
                         <div className="flex gap-2">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleEditAppointment(appointment.id)}
+                          >
                             <Pencil className="h-4 w-4" />
                             <span className="sr-only">Editar Agendamento</span>
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteAppointment(appointment.id, appointment.client?.name || 'Cliente')}
+                          >
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Cancelar Agendamento</span>
                           </Button>
@@ -232,11 +316,21 @@ export default function SchedulePage() {
                           {appointment.client_name}
                         </CardTitle>
                         <div className="flex gap-2">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleEditAppointment(appointment.id)}
+                          >
                             <Pencil className="h-4 w-4" />
                             <span className="sr-only">Editar Agendamento</span>
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteAppointment(appointment.id, appointment.client_name)}
+                          >
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Cancelar Agendamento</span>
                           </Button>
@@ -280,6 +374,39 @@ export default function SchedulePage() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Modal de Edição */}
+      <EditAppointmentModal 
+        appointment={appointmentToEdit}
+        isOpen={editModalOpen}
+        onClose={handleCloseEditModal}
+        onAppointmentUpdated={handleAppointmentUpdated}
+      />
+
+      {/* Diálogo de Confirmação de Deleção */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Agendamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja cancelar o agendamento de <strong>{appointmentToDelete?.clientName}</strong>?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>
+              Não, manter agendamento
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              disabled={deleting}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              {deleting ? 'Cancelando...' : 'Sim, cancelar agendamento'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarInset>
   )
 }
